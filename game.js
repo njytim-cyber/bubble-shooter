@@ -1132,8 +1132,13 @@ function resize() {
     // H_units = 16 * 0.866 = 13.856
     // Required H/W = 1.458 (approx 2:3 ratio, closer to mobile screens)
 
+    // Calculate max possible TILE_WIDTH based on width and height limits
+    // For mobile (small screens), use full width (no margin). For desktop, keep max width 600.
+    const isMobile = window.innerWidth <= 600;
+    const effectiveWidth = isMobile ? window.innerWidth : Math.min(window.innerWidth - 20, 600);
+
     // Available screen space
-    const maxWidth = Math.min(window.innerWidth, 600);
+    const maxWidth = effectiveWidth;
     const maxHeight = window.innerHeight;
 
     // Desired grid aspect ratio
@@ -1142,7 +1147,7 @@ function resize() {
     const aspectRatio = (gridRows * Math.sqrt(3) / 2) / gridCols; // H / W
 
     // Calculate max possible TILE_WIDTH based on width and height limits
-    const maxTileWidthByW = (maxWidth - 20) / gridCols; // 20px margin
+    const maxTileWidthByW = maxWidth / gridCols; // No margin for immersive feel
     const maxTileWidthByH = (maxHeight - 100) / (gridRows * Math.sqrt(3) / 2); // 100px margin for UI
 
     // Choose the smaller tile width to fit both

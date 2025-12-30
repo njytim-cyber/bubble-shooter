@@ -46,14 +46,20 @@ body.theme-galaxy {
 @media (max-width: 600px) {
     #game-container {
         border-radius: 0;
-        width: 100% !important;
-        height: 100% !important;
+        width: 100vw !important;
+        height: 100vh !important;
         box-shadow: none;
+        max-width: none;
+        max-height: none;
+        margin: 0;
+        padding: 0;
     }
 
     body {
         align-items: flex-start;
         /* Align into top on mobile to avoid centering issues */
+        background-color: #000;
+        /* Fallback for overscroll */
     }
 }
 
