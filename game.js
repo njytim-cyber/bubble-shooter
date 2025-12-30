@@ -1180,10 +1180,7 @@ function resize() {
     canvas.width = GAME_WIDTH * dpr;
     canvas.height = GAME_HEIGHT * dpr;
 
-    // Handle High DPI (Retina)
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = GAME_WIDTH * dpr;
-    canvas.height = GAME_HEIGHT * dpr;
+
 
     // CSS rendering size
     canvas.style.width = `${GAME_WIDTH}px`;
@@ -2430,199 +2427,131 @@ function draw() {
         ctx.restore();
     }
 
-    // Feature: Queue Visualization
-    const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT - RADIUS * 2;
 
-    // Draw queue (if enabled)
-    if (bubbleQueue && bubbleQueue.length > 0) {
-        for (let i = 0; i < bubbleQueue.length; i++) {
-            const bubble = bubbleQueue[i];
-            if (!bubble) continue;
+}
 
-            let qx, qy, size;
-
-            // Queue items are positioned to the right of the shooter
-            const queueOffsetX = cx + RADIUS * 2.5 + (i * RADIUS * 2.2);
-            // Or maybe separate... let's put them near the shooter
-
-            // Update: Show them as "next" bubbles
-            if (i === 0) {
-                // Next bubble (small preview? No, current is already shown)
-                // Actually, let's show the queue *aside* from the current projectile
-                // We'll show the next 3 bubbles in a row
-
-                qx = cx + TILE_WIDTH * 3 + (i * TILE_WIDTH);
-                qy = cy;
-                size = RADIUS * 0.7;
-            } else {
-                qx = cx + TILE_WIDTH * 3 + (i * TILE_WIDTH);
-                qy = cy;
-                size = RADIUS * 0.7;
-            }
-
-            // Simplified Queue Position: Bottom Right
-            const spacing = RADIUS * 2.5;
-            qx = GAME_WIDTH - RADIUS * 2 - (i * spacing);
-            qy = GAME_HEIGHT - RADIUS * 2;
-            size = RADIUS * 0.8;
-
-
-            ctx.save();
-            ctx.translate(qx, qy);
-            ctx.beginPath();
-            ctx.arc(0, 0, size, 0, Math.PI * 2);
-            ctx.fillStyle = bubble.color;
-            ctx.fill();
-
-            // Queue Label
-            if (i === 0 && false) { // disable label for cleanliness
-                ctx.fillStyle = "white";
-                ctx.font = "10px Arial";
-                ctx.fillText("Next", -10, -15);
-            }
-
-            // Shine
-            ctx.beginPath();
-            ctx.arc(-size * 0.3, -size * 0.3, size * 0.3, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.fill();
-
-            // Type indicator
-            if (bubble.type !== 'normal') {
-                ctx.font = `bold ${size}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = '#fff';
-                ctx.fillText(bubble.type === 'bomb' ? '💣' : '✨', 0, 0);
-            }
-
-            ctx.restore();
-        }
+if (!isGameOver) {
+    if (isShooting && currentBubble) {
+        currentBubble.draw(ctx);
     }
 
-    if (!isGameOver) {
-        if (isShooting && currentBubble) {
-            currentBubble.draw(ctx);
-        }
+    let angle = currentAngle;
 
-        let angle = currentAngle;
+    // Draw aim guide line with BOUNCE PREVIEW
+    if (!isShooting) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
 
-        // Draw aim guide line with BOUNCE PREVIEW
-        if (!isShooting) {
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([8, 8]);
+        // Simulate trajectory with bounces
+        let simX = cx;
+        let simY = cy;
+        let simVX = Math.cos(angle);
+        let simVY = Math.sin(angle);
+        const maxPoints = 200;
+        const stepSize = 5;
 
-            // Simulate trajectory with bounces
-            let simX = cx;
-            let simY = cy;
-            let simVX = Math.cos(angle);
-            let simVY = Math.sin(angle);
-            const maxPoints = 200;
-            const stepSize = 5;
+        ctx.beginPath();
+        ctx.moveTo(simX, simY);
 
-            ctx.beginPath();
-            ctx.moveTo(simX, simY);
+        for (let i = 0; i < maxPoints; i++) {
+            simX += simVX * stepSize;
+            simY += simVY * stepSize;
 
-            for (let i = 0; i < maxPoints; i++) {
-                simX += simVX * stepSize;
-                simY += simVY * stepSize;
+            // Wall bounce
+            if (simX < RADIUS) {
+                simX = RADIUS;
+                simVX *= -1;
+            } else if (simX > GAME_WIDTH - RADIUS) {
+                simX = GAME_WIDTH - RADIUS;
+                simVX *= -1;
+            }
 
-                // Wall bounce
-                if (simX < RADIUS) {
-                    simX = RADIUS;
-                    simVX *= -1;
-                } else if (simX > GAME_WIDTH - RADIUS) {
-                    simX = GAME_WIDTH - RADIUS;
-                    simVX *= -1;
-                }
+            // Stop at ceiling or if going too far
+            if (simY < RADIUS * 2 || simY > cy) {
+                ctx.lineTo(simX, simY);
+                break;
+            }
 
-                // Stop at ceiling or if going too far
-                if (simY < RADIUS * 2 || simY > cy) {
-                    ctx.lineTo(simX, simY);
-                    break;
-                }
-
-                // Check collision with existing bubbles
-                let hitBubble = false;
-                for (let r = 0; r < GRID_ROWS && !hitBubble; r++) {
-                    for (let c = 0; c < GRID_COLS && !hitBubble; c++) {
-                        const b = grid[r][c];
-                        if (b && !b.popping && !b.dropping) {
-                            const dist = Math.hypot(simX - b.x, simY - b.y);
-                            if (dist < RADIUS * 2) {
-                                hitBubble = true;
-                            }
+            // Check collision with existing bubbles
+            let hitBubble = false;
+            for (let r = 0; r < GRID_ROWS && !hitBubble; r++) {
+                for (let c = 0; c < GRID_COLS && !hitBubble; c++) {
+                    const b = grid[r][c];
+                    if (b && !b.popping && !b.dropping) {
+                        const dist = Math.hypot(simX - b.x, simY - b.y);
+                        if (dist < RADIUS * 2) {
+                            hitBubble = true;
                         }
                     }
                 }
-
-                if (hitBubble) {
-                    ctx.lineTo(simX, simY);
-                    // Draw landing indicator circle
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.arc(simX, simY, RADIUS, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                    ctx.setLineDash([]);
-                    ctx.stroke();
-                    break;
-                }
-
-                ctx.lineTo(simX, simY);
             }
 
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.restore();
+            if (hitBubble) {
+                ctx.lineTo(simX, simY);
+                // Draw landing indicator circle
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(simX, simY, RADIUS, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.setLineDash([]);
+                ctx.stroke();
+                break;
+            }
+
+            ctx.lineTo(simX, simY);
         }
 
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-
-        ctx.fillStyle = '#eee';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.beginPath();
-        ctx.rect(0, -5, 60, 10);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(0, 0, 20, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
-
-        const dangerY = (GRID_ROWS - 2) * ROW_HEIGHT + GRID_TOP_OFFSET;
-        ctx.beginPath();
-        ctx.moveTo(0, dangerY);
-        ctx.lineTo(GAME_WIDTH, dangerY);
-        ctx.strokeStyle = 'rgba(233, 69, 96, 0.2)';
-        ctx.setLineDash([10, 10]);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.restore();
     }
 
-    // Draw floating texts
-    for (const ft of floatingTexts) {
-        ft.draw(ctx);
-    }
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
 
-    // Draw confetti
-    for (const c of confettiParticles) {
-        c.draw(ctx);
-    }
+    ctx.fillStyle = '#eee';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.rect(0, -5, 60, 10);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Draw screen flash overlay (for bass drop effect)
-    if (screenFlashAlpha > 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${screenFlashAlpha})`;
-        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    }
-
-    // Restore from screen shake
     ctx.restore();
+
+    const dangerY = (GRID_ROWS - 2) * ROW_HEIGHT + GRID_TOP_OFFSET;
+    ctx.beginPath();
+    ctx.moveTo(0, dangerY);
+    ctx.lineTo(GAME_WIDTH, dangerY);
+    ctx.strokeStyle = 'rgba(233, 69, 96, 0.2)';
+    ctx.setLineDash([10, 10]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+// Draw floating texts
+for (const ft of floatingTexts) {
+    ft.draw(ctx);
+}
+
+// Draw confetti
+for (const c of confettiParticles) {
+    c.draw(ctx);
+}
+
+// Draw screen flash overlay (for bass drop effect)
+if (screenFlashAlpha > 0) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${screenFlashAlpha})`;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+}
+
+// Restore from screen shake
+ctx.restore();
 }
 
 function loop(timestamp) {
