@@ -1120,35 +1120,83 @@ let GAME_HEIGHT = 0;
 
 // Setup Canvas size
 function resize() {
-    const aspectRatio = 3 / 4;
-    let w = Math.min(window.innerWidth - 20, 600);
-    if (w < 300) w = 300; // Minimum width safety
-    let h = w / aspectRatio;
+    // 1. Calculate aspect ratio based on grid logic
+    // Width = (GRID_COLS + 0.5) * TILE_WIDTH
+    // Height = GRID_ROWS * ROW_HEIGHT + MARGIN
+    // ROW_HEIGHT = (TILE_WIDTH / 2) * Math.sqrt(3)
+    // Aspect Ratio (H/W) = (GRID_ROWS * sqrt(3) / 2) / (GRID_COLS + 0.5)
 
-    if (h > window.innerHeight - 20) {
-        h = window.innerHeight - 20;
-        w = h * aspectRatio;
-    }
+    // For Cols=9, Rows=16:
+    // W_units = 9.5
+    // H_units = 16 * 0.866 = 13.856
+    // Required H/W = 1.458 (approx 2:3 ratio, closer to mobile screens)
 
-    canvas.width = w;
-    canvas.height = h;
-    container.style.width = `${w}px`;
-    container.style.height = `${h}px`;
+    // Available screen space
+    const maxWidth = Math.min(window.innerWidth, 600);
+    const maxHeight = window.innerHeight;
 
-    GAME_WIDTH = w;
-    GAME_HEIGHT = h;
+    // Desired grid aspect ratio
+    const gridCols = GRID_COLS + 0.5;
+    const gridRows = GRID_ROWS;
+    const aspectRatio = (gridRows * Math.sqrt(3) / 2) / gridCols; // H / W
 
-    TILE_WIDTH = GAME_WIDTH / (GRID_COLS + 0.5);
+    // Calculate max possible TILE_WIDTH based on width and height limits
+    const maxTileWidthByW = (maxWidth - 20) / gridCols; // 20px margin
+    const maxTileWidthByH = (maxHeight - 100) / (gridRows * Math.sqrt(3) / 2); // 100px margin for UI
+
+    // Choose the smaller tile width to fit both
+    TILE_WIDTH = Math.min(maxTileWidthByW, maxTileWidthByH);
+
+    // Determine final game geometry
+    GAME_WIDTH = TILE_WIDTH * gridCols;
+    GAME_HEIGHT = TILE_WIDTH * (gridRows * Math.sqrt(3) / 2); // Tight fit to grid
+
+    // Add some padding for the shooter area at bottom
+    GAME_HEIGHT += TILE_WIDTH * 2;
+
+    // Handle High DPI (Retina)
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = GAME_WIDTH * dpr;
+    canvas.height = GAME_HEIGHT * dpr;
+
+    // CSS rendering size
+    canvas.style.width = `${GAME_WIDTH}px`;
+    canvas.style.height = `${GAME_HEIGHT}px`;
+    container.style.width = `${GAME_WIDTH}px`;
+    container.style.height = `${GAME_HEIGHT}px`;
+
+    // Scale context for DPI
+    ctx.scale(dpr, dpr);
+
+    // Update game constants
     RADIUS = TILE_WIDTH / 2 - 1;
-    ROW_HEIGHT = RADIUS * Math.sqrt(3);
-    console.log('Resized:', { w, h, TILE_WIDTH, RADIUS, ROW_HEIGHT });
+    // Safety for small screens
+    if (RADIUS < 1) RADIUS = 1;
+
+    ROW_HEIGHT = RADIUS * Math.sqrt(3); // Update based on RADIUS to be consistent
+    // Actually, stick to TILE_WIDTH math for grid alignment, use RADIUS for drawing size
+    ROW_HEIGHT = (TILE_WIDTH / 2) * Math.sqrt(3);
+
+    console.log('Resized:', {
+        window: { w: window.innerWidth, h: window.innerHeight },
+        game: { w: GAME_WIDTH, h: GAME_HEIGHT },
+        grid: { tile: TILE_WIDTH, radius: RADIUS }
+    });
 
     drawMissIndicator();
 }
 
 window.addEventListener('resize', () => {
     resize();
-    if (!isGameOver && grid.length > 0) draw();
+    // Re-calculate bubble positions since TILE_WIDTH changed
+    if (grid.length > 0) {
+        for (let r = 0; r < GRID_ROWS; r++) {
+            for (let c = 0; c < GRID_COLS; c++) {
+                if (grid[r][c]) grid[r][c].calculatePos();
+            }
+        }
+    }
+    if (!isGameOver) draw();
 });
 
 canvas.addEventListener('mousemove', e => {

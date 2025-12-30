@@ -39,6 +39,22 @@ body.theme-galaxy {
     border-radius: 12px;
     overflow: hidden;
     backdrop-filter: blur(5px);
+    max-width: 100vw;
+    max-height: 100vh;
+}
+
+@media (max-width: 600px) {
+    #game-container {
+        border-radius: 0;
+        width: 100% !important;
+        height: 100% !important;
+        box-shadow: none;
+    }
+
+    body {
+        align-items: flex-start;
+        /* Align into top on mobile to avoid centering issues */
+    }
 }
 
 canvas {
