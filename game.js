@@ -47,7 +47,7 @@ let GRID_TOP_OFFSET = 80; // Space for HUD
 const GAME_VERSION = '1.1.0';
 const UPDATE_NOTES = [
     "📱 Mobile Layout Fixed! (No more white bars)",
-    "🎯 HUD Moved to Top (Clearer view)",
+    "🎯 HUD Moved to Top (Safe & Clear)",
     "🔮 New Feature: Bubble Queue!",
     "✨ Better Graphics & DPI Support"
 ];
@@ -55,6 +55,8 @@ const UPDATE_NOTES = [
 // Feature: Bubble Queue
 let bubbleQueue = [];
 const QUEUE_SIZE = 3;
+
+
 
 // Special Bubble Types
 const BUBBLE_NORMAL = 'normal';
@@ -1553,58 +1555,32 @@ class Bubble {
     }
 }
 
-class FloatingText {
-    constructor(text, x, y, color) {
-        this.text = text;
-        this.x = x;
-        this.y = y;
-        this.color = color;
-        this.dy = -2;
-        this.life = 1.0;
-    }
-
-    draw(ctx) {
-        ctx.save();
-        ctx.globalAlpha = this.life;
-        ctx.fillStyle = this.color;
-        ctx.font = 'bold 20px Arial';
-        ctx.fillText(this.text, this.x, this.y);
-        ctx.restore();
-
-        this.y += this.dy;
-        this.life -= 0.02;
+// Update Logic
+function checkUpdate() {
+    const lastVersion = localStorage.getItem('lastVersion');
+    if (lastVersion !== GAME_VERSION) {
+        showUpdateScreen();
     }
 }
 
-class Particle {
-    constructor(x, y, color) {
-        this.x = x;
-        this.y = y;
-        this.color = color;
-        this.vx = (Math.random() - 0.5) * 6;
-        this.vy = (Math.random() - 0.5) * 6;
-        this.life = 1.0;
-        this.size = Math.random() * 4 + 2;
-    }
-
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.life -= 0.03;
-        this.size *= 0.95;
-    }
-
-    draw(ctx) {
-        if (this.life <= 0) return;
-        ctx.globalAlpha = this.life;
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-    }
+function showUpdateScreen() {
+    const list = document.getElementById('update-list');
+    list.innerHTML = '';
+    UPDATE_NOTES.forEach(note => {
+        const li = document.createElement('li');
+        li.textContent = note;
+        list.appendChild(li);
+    });
+    document.getElementById('update-version').textContent = `v${GAME_VERSION}`;
+    document.getElementById('update-screen').classList.remove('hidden');
 }
 
+function closeUpdateScreen() {
+    document.getElementById('update-screen').classList.add('hidden');
+    localStorage.setItem('lastVersion', GAME_VERSION);
+}
+
+// --- Classes ---
 class Projectile {
     constructor(x, y, color, angle, type = BUBBLE_NORMAL) {
         this.x = x;
@@ -2124,53 +2100,16 @@ function findFloatingClusters() {
     return floating;
 }
 
-// Haptics & Screen Shake Helpers
-function vibrate(ms) {
-    if (navigator.vibrate) navigator.vibrate(ms);
-}
-
-function shakeScreen(intensity) {
-    screenShakeAmount = intensity;
-    setTimeout(() => { screenShakeAmount = 0; }, 200);
-}
-
-function spawnFloatingText(text, x, y, color) {
-    floatingTexts.push(new FloatingText(text, x, y, color));
-}
-
 function popBubbles(locations) {
-    if (locations.length === 0) return;
-
-    // Feature: Haptics
-    vibrate(50);
-
-    // Feature: Screen Shake (intensity based on count)
-    shakeScreen(Math.min(10, locations.length));
-
-    // Calculate score center for floating text
-    let avgX = 0;
-    let avgY = 0;
-
     for (let loc of locations) {
         const b = grid[loc.r][loc.c];
         if (b) {
             b.popping = true;
-            // Feature: Juicy Particles
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < 5; i++) {
                 particles.push(new Particle(b.x, b.y, b.color));
             }
-            avgX += b.x;
-            avgY += b.y;
         }
         grid[loc.r][loc.c] = null;
-    }
-
-    if (locations.length > 0) {
-        avgX /= locations.length;
-        avgY /= locations.length;
-        // Feature: Floating Text
-        const pts = locations.length * 10 * (locations.length > 5 ? 2 : 1);
-        spawnFloatingText(`+${pts}`, avgX, avgY, '#fff');
     }
 }
 
@@ -2486,20 +2425,6 @@ function draw() {
             currentBubble.draw(ctx);
         }
 
-        // Feature: Combo Heat
-        if (comboCount >= 5 && !isShooting) {
-            const intensity = Math.min(1, (comboCount - 5) / 10);
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.beginPath();
-            ctx.arc(0, 0, RADIUS * (1.2 + Math.sin(Date.now() / 100) * 0.1), 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 100, 0, ${intensity * 0.5})`;
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = 'orange';
-            ctx.fill();
-            ctx.restore();
-        }
-
         let angle = currentAngle;
 
         // Draw aim guide line with BOUNCE PREVIEW
@@ -2520,10 +2445,6 @@ function draw() {
             ctx.beginPath();
             ctx.moveTo(simX, simY);
 
-            let finalX = simX;
-            let finalY = simY;
-            let hit = false;
-
             for (let i = 0; i < maxPoints; i++) {
                 simX += simVX * stepSize;
                 simY += simVY * stepSize;
@@ -2543,8 +2464,7 @@ function draw() {
                     break;
                 }
 
-                // Collision check logic from before...
-                // (Keeping original logic roughly same but simplified for snippet)
+                // Check collision with existing bubbles
                 let hitBubble = false;
                 for (let r = 0; r < GRID_ROWS && !hitBubble; r++) {
                     for (let c = 0; c < GRID_COLS && !hitBubble; c++) {
@@ -2560,32 +2480,21 @@ function draw() {
 
                 if (hitBubble) {
                     ctx.lineTo(simX, simY);
-                    hit = true;
-                    // Retract slightly to show "touch" point not inside
-                    finalX = simX - simVX * stepSize;
-                    finalY = simY - simVY * stepSize;
+                    // Draw landing indicator circle
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(simX, simY, RADIUS, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.setLineDash([]);
+                    ctx.stroke();
                     break;
                 }
 
                 ctx.lineTo(simX, simY);
-                finalX = simX;
-                finalY = simY;
             }
 
             ctx.stroke();
             ctx.setLineDash([]);
-
-            // Feature: Super Aim (Ghost Bubble)
-            if (hit) {
-                ctx.beginPath();
-                ctx.arc(finalX, finalY, RADIUS, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.fill();
-            }
-
             ctx.restore();
         }
 
@@ -2616,19 +2525,9 @@ function draw() {
     }
 
     // Draw floating texts
-    floatingTexts = floatingTexts.filter(ft => ft.life > 0);
     for (const ft of floatingTexts) {
         ft.draw(ctx);
     }
-
-    // Update and draw particles
-    particles = particles.filter(p => p.life > 0);
-    for (const p of particles) {
-        if (p.update) p.update(); // Handle bubble drop wrapper
-        else if (p.draw) p.draw(ctx); // Handle simple particles
-    }
-
-    // Draw confetti
 
     // Draw confetti
     for (const c of confettiParticles) {

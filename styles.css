@@ -130,7 +130,8 @@ h1 {
 
 .ui-top {
     position: absolute;
-    top: 20px;
+    top: 40px;
+    /* Safe area for mobile */
     left: 20px;
 }
 
