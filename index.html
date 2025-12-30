@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Bubble Shooter</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- UI Stats (shown during gameplay) -->
+        <div id="ui-layer" class="hidden">
+            <div class="ui-top">
+                <div class="stat-box">Lvl <span id="level">1</span></div>
+                <div class="stat-box">Score: <span id="score">0</span></div>
+                <div class="stat-box">💎 <span id="coins-display">0</span></div>
+            </div>
+            <button id="pause-btn" class="pause-btn" onclick="togglePause()">⏸️</button>
+
+            <!-- Combo Meter -->
+            <div id="combo-meter" class="combo-meter" style="display: none;">
+                <span id="combo-text">1x</span>
+            </div>
+
+            <!-- Power-Up Bar -->
+            <div class="power-up-bar">
+                <button id="powerup-freeze" class="powerup-btn" onclick="activatePowerUp('freeze')" disabled>
+                    ❄️ <span class="powerup-count">0</span>
+                </button>
+                <button id="powerup-fire" class="powerup-btn" onclick="activatePowerUp('fire')" disabled>
+                    🔥 <span class="powerup-count">0</span>
+                </button>
+                <button id="powerup-laser" class="powerup-btn" onclick="activatePowerUp('laser')" disabled>
+                    🔫 <span class="powerup-count">0</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Notification Container -->
+        <div id="notification-container" class="notification-container"></div>
+
+        <!-- Misses Indicator -->
+        <div id="misses-indicator"></div>
+
+        <!-- Pause Menu Overlay -->
+        <div id="pause-menu" class="overlay hidden">
+            <h1>⏸️ PAUSED</h1>
+            <div class="pause-buttons">
+                <button class="btn btn-resume" onclick="togglePause()">▶️ RESUME</button>
+            </div>
+            <p class="pause-warning">⚠️ Warning: Leaving will lose your progress!</p>
+            <div class="pause-exit-buttons">
+                <button class="btn btn-levels btn-small" onclick="confirmExit('levels')">📊 LEVELS</button>
+                <button class="btn btn-shop btn-small" onclick="confirmExit('shop')">🛒 SHOP</button>
+                <button class="btn btn-home btn-small" onclick="confirmExit('home')">🏠 HOME</button>
+            </div>
+        </div>
+
+        <!-- Confirm Exit Overlay -->
+        <div id="confirm-exit" class="overlay hidden">
+            <h1>⚠️ LEAVE GAME?</h1>
+            <p class="confirm-warning">Your current progress will be LOST!</p>
+            <p class="confirm-score">Current Score: <span id="confirm-score-value">0</span></p>
+            <div class="confirm-buttons">
+                <button class="btn btn-resume" onclick="cancelExit()">❌ STAY</button>
+                <button class="btn btn-danger" onclick="confirmExitNow()">✓ LEAVE</button>
+            </div>
+        </div>
+
+        <!-- Main Menu Screen -->
+        <div id="main-menu" class="overlay">
+            <h1 onclick="onTitleClick()" style="cursor: pointer;">🫧 BUBBLE<br>SHOOTER</h1>
+            <p class="high-score">🏆 Best: <span id="high-score">0</span></p>
+            <div class="menu-buttons">
+                <button class="btn btn-play" onclick="showScreen('start-screen')">▶ PLAY</button>
+                <button class="btn btn-daily" onclick="showScreen('daily-screen')">🎯 DAILY</button>
+                <button class="btn btn-levels" onclick="showScreen('levels-screen')">📊 LEVELS</button>
+                <button class="btn btn-shop" onclick="showScreen('shop-screen')">🛒 SHOP</button>
+                <button class="btn btn-achievements" onclick="showScreen('achievements-screen')">🏆 AWARDS</button>
+            </div>
+        </div>
+
+        <!-- Start Screen (Play confirmation) -->
+        <div id="start-screen" class="overlay hidden">
+            <h1>READY?</h1>
+            <p class="instructions">Clear bubbles before they reach the bottom!</p>
+            <p class="instructions">💣 Bomb = Explode area | ✨ Rainbow = Clear color</p>
+            <button class="btn" onclick="startGame()">LET'S GO!</button>
+            <button class="btn btn-back" onclick="showScreen('main-menu')">← BACK</button>
+        </div>
+
+        <!-- Levels Screen -->
+        <div id="levels-screen" class="overlay hidden">
+            <h1>SELECT LEVEL</h1>
+
+            <!-- Progress Bar -->
+            <div class="levels-progress-container">
+                <div class="levels-progress-bar">
+                    <div class="levels-progress-fill" id="levels-progress-fill"></div>
+                </div>
+                <span class="levels-progress-text" id="levels-progress-text">0/100 ⭐</span>
+            </div>
+
+            <!-- Quick Play Button -->
+            <button class="btn btn-quick-play" id="quick-play-btn" onclick="quickPlayHighest()">
+                🚀 CONTINUE LEVEL <span id="quick-play-level">1</span>
+            </button>
+
+            <!-- Worlds Container -->
+            <div class="levels-worlds-container" id="levels-worlds-container">
+                <!-- Sky World -->
+                <div class="world-section" id="world-sky">
+                    <div class="world-header world-header-sky">
+                        <span class="world-icon">☁️</span>
+                        <span class="world-name">Sky World</span>
+                        <span class="world-range">1-19</span>
+                    </div>
+                    <div class="levels-grid levels-grid-sky" id="levels-grid-sky"></div>
+                </div>
+
+                <!-- Moon World -->
+                <div class="world-section" id="world-moon">
+                    <div class="world-header world-header-moon">
+                        <span class="world-icon">🌙</span>
+                        <span class="world-name">Moon World</span>
+                        <span class="world-range">20-39</span>
+                    </div>
+                    <div class="levels-grid levels-grid-moon" id="levels-grid-moon"></div>
+                </div>
+
+                <!-- Galaxy World -->
+                <div class="world-section" id="world-galaxy">
+                    <div class="world-header world-header-galaxy">
+                        <span class="world-icon">🌌</span>
+                        <span class="world-name">Galaxy World</span>
+                        <span class="world-range">40-100</span>
+                    </div>
+                    <div class="levels-grid levels-grid-galaxy" id="levels-grid-galaxy"></div>
+                </div>
+            </div>
+
+            <button class="btn btn-back" onclick="showScreen('main-menu')">← BACK</button>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop-screen" class="overlay hidden">
+            <h1>🛒 SHOP</h1>
+            <p class="coins-display">💎 <span id="shop-coins">0</span> coins</p>
+            <div class="shop-grid" id="shop-grid">
+                <!-- Generated by JS -->
+            </div>
+            <button class="btn btn-back" onclick="showScreen('main-menu')">← BACK</button>
+            <!-- Secret Button - tiny and hidden in corner -->
+            <button id="secret-btn" class="secret-btn" onclick="showScreen('secret-screen')">?</button>
+        </div>
+
+        <!-- Secret Level Screen -->
+        <div id="secret-screen" class="overlay hidden">
+            <h1>🌟 SECRET LEVEL 🌟</h1>
+            <p class="secret-desc">A legendary challenge awaits...</p>
+            <p class="secret-warning">⚠️ EXTREME DIFFICULTY ⚠️</p>
+            <div class="secret-info">
+                <p>💎 Entry Fee: <span class="fee">100</span></p>
+                <p>🏆 Reward: <span class="reward">500 💎</span></p>
+            </div>
+            <p id="secret-status" class="secret-status"></p>
+            <button id="secret-play-btn" class="btn btn-secret" onclick="startSecretLevel()">🔮 ENTER</button>
+            <button class="btn btn-back" onclick="showScreen('shop-screen')">← BACK</button>
+        </div>
+
+        <!-- Daily Challenge Screen -->
+        <div id="daily-screen" class="overlay hidden">
+            <h1>🎯 DAILY CHALLENGE</h1>
+            <div class="daily-container">
+                <div class="daily-challenge-box">
+                    <h2 id="daily-challenge-name">Pop 50 Bubbles</h2>
+                    <div class="daily-progress-bar">
+                        <div class="daily-progress-fill" id="daily-progress-fill"></div>
+                    </div>
+                    <p class="daily-progress-text" id="daily-progress-text">0/50</p>
+                </div>
+                <p id="daily-streak" class="daily-streak">🔥 0 day streak</p>
+                <p id="daily-status" class="daily-status">⏳ In Progress</p>
+                <div class="daily-rewards">
+                    <p>✨ Complete: <span class="reward-text">25💎</span></p>
+                    <p>🔥 7-day streak: <span class="reward-text">100💎</span></p>
+                    <p>⭐ 30-day streak: <span class="reward-text">500💎</span></p>
+                </div>
+            </div>
+            <button class="btn btn-play" onclick="showScreen('start-screen')">▶ PLAY NOW</button>
+            <button class="btn btn-back" onclick="showScreen('main-menu')">← BACK</button>
+        </div>
+
+        <!-- Achievements Screen -->
+        <div id="achievements-screen" class="overlay hidden">
+            <h1>🏆 ACHIEVEMENTS</h1>
+            <div class="achievements-grid" id="achievements-grid">
+                <!-- Generated by JS -->
+            </div>
+            <button class="btn btn-back" onclick="showScreen('main-menu')">← BACK</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="overlay hidden">
+            <h1>GAME OVER</h1>
+            <p class="score-display">Score: <span id="final-score">0</span></p>
+            <p class="coins-earned">+<span id="coins-earned">0</span> 💎</p>
+            <p class="new-high" id="new-high" style="display:none;">🎉 NEW HIGH SCORE!</p>
+            <button class="btn" onclick="startGame()">TRY AGAIN</button>
+            <button class="btn btn-back" onclick="showScreen('main-menu')">🏠 MENU</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+
+</html>
