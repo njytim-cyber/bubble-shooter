@@ -1149,9 +1149,11 @@ function resize() {
 
     // Available screen space
     // Available screen space
-    const maxWidth = Math.min(window.innerWidth, 600);
-    // Use innerHeight to ensure we fill the observable screen
-    const maxHeight = window.innerHeight;
+    // Best Practice: Let CSS determine container size, then fill it.
+    // Use container dimensions which are set by CSS (100dvh on mobile, fixed on desktop)
+    const containerRect = container.getBoundingClientRect();
+    const maxWidth = containerRect.width;
+    const maxHeight = containerRect.height;
 
     // Desired grid aspect ratio
     const gridCols = GRID_COLS + 0.5;
@@ -1166,11 +1168,17 @@ function resize() {
     TILE_WIDTH = Math.min(maxTileWidthByW, maxTileWidthByH);
 
     // Determine final game geometry
+    // Since we are matching the container (which is 100dvh on mobile), we just fill it.
     GAME_WIDTH = TILE_WIDTH * gridCols;
-    GAME_HEIGHT = TILE_WIDTH * (gridRows * Math.sqrt(3) / 2); // Tight fit to grid
+    GAME_HEIGHT = maxHeight; // Always fill the container height
 
-    // Add some padding for the shooter area at bottom
-    GAME_HEIGHT += TILE_WIDTH * 2;
+    // Adjust top offset dynamically
+    GRID_TOP_OFFSET = Math.max(80, GAME_HEIGHT * 0.12);
+
+    // Handle High DPI (Retina)
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = GAME_WIDTH * dpr;
+    canvas.height = GAME_HEIGHT * dpr;
 
     // Handle High DPI (Retina)
     const dpr = window.devicePixelRatio || 1;

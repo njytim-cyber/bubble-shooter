@@ -43,30 +43,71 @@ body.theme-galaxy {
     max-height: 100vh;
 }
 
-@media (max-width: 600px) {
+/* --- Responsive Design (Best Practices) --- */
+
+/* Tablet & Smaller Desktop (Max Width: 1024px) */
+@media (max-width: 1024px) {
     #game-container {
+        width: 100%;
+        height: 100dvh;
+        /* Dynamic viewport height for mobile browsers */
+        max-width: 100%;
+        max-height: 100dvh;
         border-radius: 0;
-        width: 100% !important;
-        height: 100vh !important;
-        /* Force viewport height */
         box-shadow: none;
         margin: 0;
     }
 
     body {
         align-items: flex-start;
-        height: 100vh;
+        /* Top align to avoid centering shifts */
+        height: 100dvh;
         overflow: hidden;
-        /* Prevent body scroll */
+    }
+
+    /* Fluid Typography for Headers */
+    h1 {
+        font-size: clamp(2rem, 5vw, 3rem);
+        margin-bottom: 0.5rem;
     }
 
     .overlay {
         justify-content: flex-start;
-        /* Align top */
-        padding-top: 60px;
-        /* Safe area for header */
+        padding-top: max(40px, env(safe-area-inset-top));
+        /* Handle notch */
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
         overflow-y: auto;
-        /* Allow scrolling if really small */
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Adjust UI Overlay positions for smaller screens */
+    .ui-top {
+        top: max(20px, env(safe-area-inset-top));
+        left: max(20px, env(safe-area-inset-left));
+    }
+
+    .pause-btn {
+        top: max(15px, env(safe-area-inset-top));
+        right: max(15px, env(safe-area-inset-right));
+    }
+
+    .power-up-bar {
+        top: max(80px, calc(env(safe-area-inset-top) + 60px));
+        right: max(10px, env(safe-area-inset-right));
+    }
+}
+
+/* Mobile Specific (Max Width: 600px) */
+@media (max-width: 600px) {
+
+    /* Further adjustments for small screens if needed */
+    .btn {
+        padding: 12px 30px;
+        font-size: 1.2rem;
+    }
+
+    .daily-challenge-box {
+        width: 95%;
     }
 }
 
