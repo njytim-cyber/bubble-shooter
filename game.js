@@ -41,6 +41,20 @@ const AIM_SPEED = 0.03;
 let level = 1;
 let bubblesCleared = 0;
 const BUBBLES_PER_LEVEL = 30;
+let GRID_TOP_OFFSET = 80; // Space for HUD
+
+// Update System
+const GAME_VERSION = '1.1.0';
+const UPDATE_NOTES = [
+    "📱 Mobile Layout Fixed! (No more white bars)",
+    "🎯 HUD Moved to Top (Clearer view)",
+    "🔮 New Feature: Bubble Queue!",
+    "✨ Better Graphics & DPI Support"
+];
+
+// Feature: Bubble Queue
+let bubbleQueue = [];
+const QUEUE_SIZE = 3;
 
 // Special Bubble Types
 const BUBBLE_NORMAL = 'normal';
@@ -1285,11 +1299,59 @@ function updateMouseFromAngle() {
 }
 
 function shootBubbleWithAngle(angle) {
+    if (bubbleQueue.length === 0) return;
+
     isShooting = true;
+    const nextBubble = bubbleQueue.shift(); // Get next from queue (index 0)
+
+    // Replenish queue
+    while (bubbleQueue.length < QUEUE_SIZE) {
+        bubbleQueue.push(generateNextBubbleData());
+    }
+
     const startX = GAME_WIDTH / 2;
     const startY = GAME_HEIGHT - RADIUS * 2;
     currentBubble = new Projectile(startX, startY, nextBubble.color, angle, nextBubble.type);
-    nextBubble = getNextBubble();
+
+    // nextBubble variable is removed, queue handles it
+}
+
+function generateNextBubbleData() {
+    const validColors = getExistingColors();
+    const color = validColors[Math.floor(Math.random() * validColors.length)];
+
+    // 5% chance for special bubbles
+    let type = BUBBLE_NORMAL;
+    if (Math.random() < 0.05) {
+        type = Math.random() < 0.5 ? BUBBLE_BOMB : BUBBLE_RAINBOW;
+    }
+
+    return { color, type };
+}
+
+// Update Logic
+function checkUpdate() {
+    const lastVersion = localStorage.getItem('lastVersion');
+    if (lastVersion !== GAME_VERSION) {
+        showUpdateScreen();
+    }
+}
+
+function showUpdateScreen() {
+    const list = document.getElementById('update-list');
+    list.innerHTML = '';
+    UPDATE_NOTES.forEach(note => {
+        const li = document.createElement('li');
+        li.textContent = note;
+        list.appendChild(li);
+    });
+    document.getElementById('update-version').textContent = `v${GAME_VERSION}`;
+    document.getElementById('update-screen').classList.remove('hidden');
+}
+
+function closeUpdateScreen() {
+    document.getElementById('update-screen').classList.add('hidden');
+    localStorage.setItem('lastVersion', GAME_VERSION);
 }
 
 // --- Classes ---
@@ -1335,7 +1397,7 @@ class Bubble {
     calculatePos() {
         const offset = (this.r % 2 === 1) ? TILE_WIDTH / 2 : 0;
         this.targetX = (this.c * TILE_WIDTH) + TILE_WIDTH / 2 + offset;
-        this.targetY = (this.r * ROW_HEIGHT) + TILE_WIDTH / 2;
+        this.targetY = (this.r * ROW_HEIGHT) + TILE_WIDTH / 2 + GRID_TOP_OFFSET;
     }
 
     update(dt) {
@@ -1491,6 +1553,58 @@ class Bubble {
     }
 }
 
+class FloatingText {
+    constructor(text, x, y, color) {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.dy = -2;
+        this.life = 1.0;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+
+        this.y += this.dy;
+        this.life -= 0.02;
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.vx = (Math.random() - 0.5) * 6;
+        this.vy = (Math.random() - 0.5) * 6;
+        this.life = 1.0;
+        this.size = Math.random() * 4 + 2;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.03;
+        this.size *= 0.95;
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
 class Projectile {
     constructor(x, y, color, angle, type = BUBBLE_NORMAL) {
         this.x = x;
@@ -1598,7 +1712,7 @@ class Projectile {
         let bestR = -1;
         let bestC = -1;
 
-        const approxRow = Math.floor(this.y / ROW_HEIGHT);
+        const approxRow = Math.floor((this.y - GRID_TOP_OFFSET) / ROW_HEIGHT);
         const startRow = Math.max(0, approxRow - 2);
         const endRow = Math.min(GRID_ROWS - 1, approxRow + 2);
 
@@ -1608,7 +1722,7 @@ class Projectile {
 
                 const offset = (r % 2 === 1) ? TILE_WIDTH / 2 : 0;
                 const cx = (c * TILE_WIDTH) + TILE_WIDTH / 2 + offset;
-                const cy = (r * ROW_HEIGHT) + TILE_WIDTH / 2;
+                const cy = (r * ROW_HEIGHT) + TILE_WIDTH / 2 + GRID_TOP_OFFSET;
 
                 const dist = Math.hypot(this.x - cx, this.y - cy);
 
@@ -2010,16 +2124,53 @@ function findFloatingClusters() {
     return floating;
 }
 
+// Haptics & Screen Shake Helpers
+function vibrate(ms) {
+    if (navigator.vibrate) navigator.vibrate(ms);
+}
+
+function shakeScreen(intensity) {
+    screenShakeAmount = intensity;
+    setTimeout(() => { screenShakeAmount = 0; }, 200);
+}
+
+function spawnFloatingText(text, x, y, color) {
+    floatingTexts.push(new FloatingText(text, x, y, color));
+}
+
 function popBubbles(locations) {
+    if (locations.length === 0) return;
+
+    // Feature: Haptics
+    vibrate(50);
+
+    // Feature: Screen Shake (intensity based on count)
+    shakeScreen(Math.min(10, locations.length));
+
+    // Calculate score center for floating text
+    let avgX = 0;
+    let avgY = 0;
+
     for (let loc of locations) {
         const b = grid[loc.r][loc.c];
         if (b) {
             b.popping = true;
-            for (let i = 0; i < 5; i++) {
+            // Feature: Juicy Particles
+            for (let i = 0; i < 8; i++) {
                 particles.push(new Particle(b.x, b.y, b.color));
             }
+            avgX += b.x;
+            avgY += b.y;
         }
         grid[loc.r][loc.c] = null;
+    }
+
+    if (locations.length > 0) {
+        avgX /= locations.length;
+        avgY /= locations.length;
+        // Feature: Floating Text
+        const pts = locations.length * 10 * (locations.length > 5 ? 2 : 1);
+        spawnFloatingText(`+${pts}`, avgX, avgY, '#fff');
     }
 }
 
@@ -2280,25 +2431,72 @@ function draw() {
         tp.draw(ctx);
     }
 
-    if (!isGameOver) {
-        const cx = GAME_WIDTH / 2;
-        const cy = GAME_HEIGHT - RADIUS * 2;
+    // Feature: Queue Visualization
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT - RADIUS * 2;
 
+    // Draw queue
+    for (let i = 0; i < bubbleQueue.length; i++) {
+        const bubble = bubbleQueue[i];
+        if (!bubble) continue;
+
+        let qx, qy, size;
+
+        if (i === 0) {
+            // Main bubble (ready to shoot)
+            qx = cx;
+            qy = cy;
+            size = RADIUS;
+        } else {
+            // Upcoming bubbles (small queue on side)
+            const queueOffsetX = cx + RADIUS * 2.5 + (i - 1) * RADIUS * 1.5;
+            const queueOffsetY = cy + RADIUS;
+            qx = queueOffsetX;
+            qy = queueOffsetY;
+            size = RADIUS * 0.6;
+        }
+
+        ctx.save();
+        ctx.translate(qx, qy);
+        ctx.beginPath();
+        ctx.arc(0, 0, size, 0, Math.PI * 2);
+        ctx.fillStyle = bubble.color;
+        ctx.fill();
+
+        // Shine
+        ctx.beginPath();
+        ctx.arc(-size * 0.3, -size * 0.3, size * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fill();
+
+        // Type indicator for queue
+        if (bubble.type !== BUBBLE_NORMAL) {
+            ctx.font = `bold ${size}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(bubble.type === BUBBLE_BOMB ? '💣' : '✨', 0, 0);
+        }
+
+        ctx.restore();
+    }
+
+    if (!isGameOver) {
         if (isShooting && currentBubble) {
             currentBubble.draw(ctx);
-        } else if (nextBubble) {
+        }
+
+        // Feature: Combo Heat
+        if (comboCount >= 5 && !isShooting) {
+            const intensity = Math.min(1, (comboCount - 5) / 10);
             ctx.save();
             ctx.translate(cx, cy);
-
             ctx.beginPath();
-            ctx.arc(0, 0, RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = nextBubble.color;
+            ctx.arc(0, 0, RADIUS * (1.2 + Math.sin(Date.now() / 100) * 0.1), 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 100, 0, ${intensity * 0.5})`;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = 'orange';
             ctx.fill();
-            ctx.beginPath();
-            ctx.arc(-RADIUS * 0.3, -RADIUS * 0.3, RADIUS * 0.3, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.fill();
-
             ctx.restore();
         }
 
@@ -2322,6 +2520,10 @@ function draw() {
             ctx.beginPath();
             ctx.moveTo(simX, simY);
 
+            let finalX = simX;
+            let finalY = simY;
+            let hit = false;
+
             for (let i = 0; i < maxPoints; i++) {
                 simX += simVX * stepSize;
                 simY += simVY * stepSize;
@@ -2341,7 +2543,8 @@ function draw() {
                     break;
                 }
 
-                // Check collision with existing bubbles
+                // Collision check logic from before...
+                // (Keeping original logic roughly same but simplified for snippet)
                 let hitBubble = false;
                 for (let r = 0; r < GRID_ROWS && !hitBubble; r++) {
                     for (let c = 0; c < GRID_COLS && !hitBubble; c++) {
@@ -2357,21 +2560,32 @@ function draw() {
 
                 if (hitBubble) {
                     ctx.lineTo(simX, simY);
-                    // Draw landing indicator circle
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.arc(simX, simY, RADIUS, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                    ctx.setLineDash([]);
-                    ctx.stroke();
+                    hit = true;
+                    // Retract slightly to show "touch" point not inside
+                    finalX = simX - simVX * stepSize;
+                    finalY = simY - simVY * stepSize;
                     break;
                 }
 
                 ctx.lineTo(simX, simY);
+                finalX = simX;
+                finalY = simY;
             }
 
             ctx.stroke();
             ctx.setLineDash([]);
+
+            // Feature: Super Aim (Ghost Bubble)
+            if (hit) {
+                ctx.beginPath();
+                ctx.arc(finalX, finalY, RADIUS, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fill();
+            }
+
             ctx.restore();
         }
 
@@ -2391,7 +2605,7 @@ function draw() {
 
         ctx.restore();
 
-        const dangerY = (GRID_ROWS - 2) * ROW_HEIGHT;
+        const dangerY = (GRID_ROWS - 2) * ROW_HEIGHT + GRID_TOP_OFFSET;
         ctx.beginPath();
         ctx.moveTo(0, dangerY);
         ctx.lineTo(GAME_WIDTH, dangerY);
@@ -2402,9 +2616,19 @@ function draw() {
     }
 
     // Draw floating texts
+    floatingTexts = floatingTexts.filter(ft => ft.life > 0);
     for (const ft of floatingTexts) {
         ft.draw(ctx);
     }
+
+    // Update and draw particles
+    particles = particles.filter(p => p.life > 0);
+    for (const p of particles) {
+        if (p.update) p.update(); // Handle bubble drop wrapper
+        else if (p.draw) p.draw(ctx); // Handle simple particles
+    }
+
+    // Draw confetti
 
     // Draw confetti
     for (const c of confettiParticles) {
@@ -2455,8 +2679,17 @@ function startGame() {
     comboMultiplier = 1;
     activePowerUp = null;
     freezeShots = 0;
+    comboCount = 0;
+    comboMultiplier = 1;
+    activePowerUp = null;
+    freezeShots = 0;
     currentAngle = -Math.PI / 2;
-    nextBubble = getNextBubble();
+
+    // Init Queue
+    bubbleQueue = [];
+    for (let i = 0; i < QUEUE_SIZE; i++) {
+        bubbleQueue.push(generateNextBubbleData());
+    }
 
     updateUI();
     updateMissIndicator();
@@ -2471,6 +2704,7 @@ function startGame() {
 
 // Init
 resize();
+checkUpdate(); // Check for updates on load
 loadPlayerData();
 showScreen('main-menu');
 // Initial draw to show something on background (optional)
