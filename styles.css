@@ -47,13 +47,26 @@ body.theme-galaxy {
     #game-container {
         border-radius: 0;
         width: 100% !important;
-        height: 100% !important;
+        height: 100vh !important;
+        /* Force viewport height */
         box-shadow: none;
+        margin: 0;
     }
 
     body {
         align-items: flex-start;
-        /* Align into top on mobile to avoid centering issues */
+        height: 100vh;
+        overflow: hidden;
+        /* Prevent body scroll */
+    }
+
+    .overlay {
+        justify-content: flex-start;
+        /* Align top */
+        padding-top: 60px;
+        /* Safe area for header */
+        overflow-y: auto;
+        /* Allow scrolling if really small */
     }
 }
 

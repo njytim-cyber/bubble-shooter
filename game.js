@@ -1148,7 +1148,9 @@ function resize() {
     // Required H/W = 1.458 (approx 2:3 ratio, closer to mobile screens)
 
     // Available screen space
+    // Available screen space
     const maxWidth = Math.min(window.innerWidth, 600);
+    // Use innerHeight to ensure we fill the observable screen
     const maxHeight = window.innerHeight;
 
     // Desired grid aspect ratio
@@ -2418,6 +2420,77 @@ function draw() {
         }
 
         ctx.restore();
+    }
+
+    // Feature: Queue Visualization
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT - RADIUS * 2;
+
+    // Draw queue (if enabled)
+    if (bubbleQueue && bubbleQueue.length > 0) {
+        for (let i = 0; i < bubbleQueue.length; i++) {
+            const bubble = bubbleQueue[i];
+            if (!bubble) continue;
+
+            let qx, qy, size;
+
+            // Queue items are positioned to the right of the shooter
+            const queueOffsetX = cx + RADIUS * 2.5 + (i * RADIUS * 2.2);
+            // Or maybe separate... let's put them near the shooter
+
+            // Update: Show them as "next" bubbles
+            if (i === 0) {
+                // Next bubble (small preview? No, current is already shown)
+                // Actually, let's show the queue *aside* from the current projectile
+                // We'll show the next 3 bubbles in a row
+
+                qx = cx + TILE_WIDTH * 3 + (i * TILE_WIDTH);
+                qy = cy;
+                size = RADIUS * 0.7;
+            } else {
+                qx = cx + TILE_WIDTH * 3 + (i * TILE_WIDTH);
+                qy = cy;
+                size = RADIUS * 0.7;
+            }
+
+            // Simplified Queue Position: Bottom Right
+            const spacing = RADIUS * 2.5;
+            qx = GAME_WIDTH - RADIUS * 2 - (i * spacing);
+            qy = GAME_HEIGHT - RADIUS * 2;
+            size = RADIUS * 0.8;
+
+
+            ctx.save();
+            ctx.translate(qx, qy);
+            ctx.beginPath();
+            ctx.arc(0, 0, size, 0, Math.PI * 2);
+            ctx.fillStyle = bubble.color;
+            ctx.fill();
+
+            // Queue Label
+            if (i === 0 && false) { // disable label for cleanliness
+                ctx.fillStyle = "white";
+                ctx.font = "10px Arial";
+                ctx.fillText("Next", -10, -15);
+            }
+
+            // Shine
+            ctx.beginPath();
+            ctx.arc(-size * 0.3, -size * 0.3, size * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.fill();
+
+            // Type indicator
+            if (bubble.type !== 'normal') {
+                ctx.font = `bold ${size}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fff';
+                ctx.fillText(bubble.type === 'bomb' ? '💣' : '✨', 0, 0);
+            }
+
+            ctx.restore();
+        }
     }
 
     if (!isGameOver) {
