@@ -117,6 +117,52 @@ let wobbleOriginX = 0; // For ripple wobble effect
 let wobbleOriginY = 0;
 let wobbleTime = 0;
 
+// Haptic Feedback Helper
+function vibrate(pattern) {
+    if (navigator.vibrate) {
+        navigator.vibrate(pattern);
+    }
+}
+
+// Floating Text for Score Popups
+class FloatingText {
+    constructor(x, y, text, color = '#FFD700') {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.life = 1.0;
+        this.vy = -80; // Float upward
+        this.scale = 1.2;
+    }
+
+    update(dt) {
+        this.y += this.vy * dt;
+        this.vy *= 0.96; // Slow down
+        this.life -= dt * 0.8;
+        this.scale = 1 + (1 - this.life) * 0.3; // Grow slightly
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.font = `bold ${Math.floor(20 * this.scale)}px Fredoka One`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+// Helper to spawn floating text
+function spawnFloatingText(x, y, points) {
+    floatingTexts.push(new FloatingText(x, y, `+${points}`, '#FFD700'));
+}
+
 
 // Shop Items
 const SHOP_ITEMS = [
@@ -1756,6 +1802,8 @@ function placeBubble(r, c, color, type = BUBBLE_NORMAL) {
         popBubbles(fireTargets);
         totalPopped = fireTargets.length;
         score += Math.floor(totalPopped * 15 * comboMultiplier);
+        spawnFloatingText(grid[r][c]?.x || GAME_WIDTH / 2, grid[r][c]?.y || GAME_HEIGHT / 2, Math.floor(totalPopped * 15 * comboMultiplier));
+        vibrate(30);
         activePowerUp = null;
         updatePowerUpUI();
         wasSuccessfulMatch = true;
@@ -1818,6 +1866,8 @@ function placeBubble(r, c, color, type = BUBBLE_NORMAL) {
             popBubblesChain(matches);
             totalPopped = matches.length;
             score += Math.floor(matches.length * 10 * comboMultiplier);
+            spawnFloatingText(grid[r][c]?.x || GAME_WIDTH / 2, grid[r][c]?.y || GAME_HEIGHT / 2, Math.floor(matches.length * 10 * comboMultiplier));
+            vibrate(20);
             wasSuccessfulMatch = true;
         } else {
             // Miss - reset combo
