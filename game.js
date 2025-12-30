@@ -43,21 +43,6 @@ let bubblesCleared = 0;
 const BUBBLES_PER_LEVEL = 30;
 let GRID_TOP_OFFSET = 80; // Space for HUD
 
-// Update System
-const GAME_VERSION = '1.1.0';
-const UPDATE_NOTES = [
-    "📱 Mobile Layout Fixed! (No more white bars)",
-    "🎯 HUD Moved to Top (Safe & Clear)",
-    "🔮 New Feature: Bubble Queue!",
-    "✨ Better Graphics & DPI Support"
-];
-
-// Feature: Bubble Queue
-let bubbleQueue = [];
-const QUEUE_SIZE = 3;
-
-
-
 // Special Bubble Types
 const BUBBLE_NORMAL = 'normal';
 const BUBBLE_BOMB = 'bomb';
@@ -1148,12 +1133,8 @@ function resize() {
     // Required H/W = 1.458 (approx 2:3 ratio, closer to mobile screens)
 
     // Available screen space
-    // Available screen space
-    // Best Practice: Let CSS determine container size, then fill it.
-    // Use container dimensions which are set by CSS (100dvh on mobile, fixed on desktop)
-    const containerRect = container.getBoundingClientRect();
-    const maxWidth = containerRect.width;
-    const maxHeight = containerRect.height;
+    const maxWidth = Math.min(window.innerWidth, 600);
+    const maxHeight = window.innerHeight;
 
     // Desired grid aspect ratio
     const gridCols = GRID_COLS + 0.5;
@@ -1168,19 +1149,18 @@ function resize() {
     TILE_WIDTH = Math.min(maxTileWidthByW, maxTileWidthByH);
 
     // Determine final game geometry
-    // Since we are matching the container (which is 100dvh on mobile), we just fill it.
     GAME_WIDTH = TILE_WIDTH * gridCols;
-    GAME_HEIGHT = maxHeight; // Always fill the container height
 
-    // Adjust top offset dynamically
-    GRID_TOP_OFFSET = Math.max(80, GAME_HEIGHT * 0.12);
+    // Force full height for mobile
+    GAME_HEIGHT = window.innerHeight;
+
+    // Adjust offset based on screen height (more space on tall phones)
+    GRID_TOP_OFFSET = Math.max(80, GAME_HEIGHT * 0.1);
 
     // Handle High DPI (Retina)
     const dpr = window.devicePixelRatio || 1;
     canvas.width = GAME_WIDTH * dpr;
     canvas.height = GAME_HEIGHT * dpr;
-
-
 
     // CSS rendering size
     canvas.style.width = `${GAME_WIDTH}px`;
@@ -1308,59 +1288,11 @@ function updateMouseFromAngle() {
 }
 
 function shootBubbleWithAngle(angle) {
-    if (bubbleQueue.length === 0) return;
-
     isShooting = true;
-    const nextBubble = bubbleQueue.shift(); // Get next from queue (index 0)
-
-    // Replenish queue
-    while (bubbleQueue.length < QUEUE_SIZE) {
-        bubbleQueue.push(generateNextBubbleData());
-    }
-
     const startX = GAME_WIDTH / 2;
     const startY = GAME_HEIGHT - RADIUS * 2;
     currentBubble = new Projectile(startX, startY, nextBubble.color, angle, nextBubble.type);
-
-    // nextBubble variable is removed, queue handles it
-}
-
-function generateNextBubbleData() {
-    const validColors = getExistingColors();
-    const color = validColors[Math.floor(Math.random() * validColors.length)];
-
-    // 5% chance for special bubbles
-    let type = BUBBLE_NORMAL;
-    if (Math.random() < 0.05) {
-        type = Math.random() < 0.5 ? BUBBLE_BOMB : BUBBLE_RAINBOW;
-    }
-
-    return { color, type };
-}
-
-// Update Logic
-function checkUpdate() {
-    const lastVersion = localStorage.getItem('lastVersion');
-    if (lastVersion !== GAME_VERSION) {
-        showUpdateScreen();
-    }
-}
-
-function showUpdateScreen() {
-    const list = document.getElementById('update-list');
-    list.innerHTML = '';
-    UPDATE_NOTES.forEach(note => {
-        const li = document.createElement('li');
-        li.textContent = note;
-        list.appendChild(li);
-    });
-    document.getElementById('update-version').textContent = `v${GAME_VERSION}`;
-    document.getElementById('update-screen').classList.remove('hidden');
-}
-
-function closeUpdateScreen() {
-    document.getElementById('update-screen').classList.add('hidden');
-    localStorage.setItem('lastVersion', GAME_VERSION);
+    nextBubble = getNextBubble();
 }
 
 // --- Classes ---
@@ -1562,32 +1494,6 @@ class Bubble {
     }
 }
 
-// Update Logic
-function checkUpdate() {
-    const lastVersion = localStorage.getItem('lastVersion');
-    if (lastVersion !== GAME_VERSION) {
-        showUpdateScreen();
-    }
-}
-
-function showUpdateScreen() {
-    const list = document.getElementById('update-list');
-    list.innerHTML = '';
-    UPDATE_NOTES.forEach(note => {
-        const li = document.createElement('li');
-        li.textContent = note;
-        list.appendChild(li);
-    });
-    document.getElementById('update-version').textContent = `v${GAME_VERSION}`;
-    document.getElementById('update-screen').classList.remove('hidden');
-}
-
-function closeUpdateScreen() {
-    document.getElementById('update-screen').classList.add('hidden');
-    localStorage.setItem('lastVersion', GAME_VERSION);
-}
-
-// --- Classes ---
 class Projectile {
     constructor(x, y, color, angle, type = BUBBLE_NORMAL) {
         this.x = x;
@@ -2377,181 +2283,145 @@ function draw() {
         tp.draw(ctx);
     }
 
-    // Feature: Queue Visualization
-    const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT - RADIUS * 2;
+    if (!isGameOver) {
+        const cx = GAME_WIDTH / 2;
+        const cy = GAME_HEIGHT - RADIUS * 2;
 
-    // Draw queue
-    for (let i = 0; i < bubbleQueue.length; i++) {
-        const bubble = bubbleQueue[i];
-        if (!bubble) continue;
+        if (isShooting && currentBubble) {
+            currentBubble.draw(ctx);
+        } else if (nextBubble) {
+            ctx.save();
+            ctx.translate(cx, cy);
 
-        let qx, qy, size;
+            ctx.beginPath();
+            ctx.arc(0, 0, RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = nextBubble.color;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(-RADIUS * 0.3, -RADIUS * 0.3, RADIUS * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.fill();
 
-        if (i === 0) {
-            // Main bubble (ready to shoot)
-            qx = cx;
-            qy = cy;
-            size = RADIUS;
-        } else {
-            // Upcoming bubbles (small queue on side)
-            const queueOffsetX = cx + RADIUS * 2.5 + (i - 1) * RADIUS * 1.5;
-            const queueOffsetY = cy + RADIUS;
-            qx = queueOffsetX;
-            qy = queueOffsetY;
-            size = RADIUS * 0.6;
+            ctx.restore();
         }
 
-        ctx.save();
-        ctx.translate(qx, qy);
-        ctx.beginPath();
-        ctx.arc(0, 0, size, 0, Math.PI * 2);
-        ctx.fillStyle = bubble.color;
-        ctx.fill();
+        let angle = currentAngle;
 
-        // Shine
-        ctx.beginPath();
-        ctx.arc(-size * 0.3, -size * 0.3, size * 0.3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.fill();
+        // Draw aim guide line with BOUNCE PREVIEW
+        if (!isShooting) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 8]);
 
-        // Type indicator for queue
-        if (bubble.type !== BUBBLE_NORMAL) {
-            ctx.font = `bold ${size}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#fff';
-            ctx.fillText(bubble.type === BUBBLE_BOMB ? '💣' : '✨', 0, 0);
-        }
+            // Simulate trajectory with bounces
+            let simX = cx;
+            let simY = cy;
+            let simVX = Math.cos(angle);
+            let simVY = Math.sin(angle);
+            const maxPoints = 200;
+            const stepSize = 5;
 
-        ctx.restore();
-    }
+            ctx.beginPath();
+            ctx.moveTo(simX, simY);
 
+            for (let i = 0; i < maxPoints; i++) {
+                simX += simVX * stepSize;
+                simY += simVY * stepSize;
 
-}
+                // Wall bounce
+                if (simX < RADIUS) {
+                    simX = RADIUS;
+                    simVX *= -1;
+                } else if (simX > GAME_WIDTH - RADIUS) {
+                    simX = GAME_WIDTH - RADIUS;
+                    simVX *= -1;
+                }
 
-if (!isGameOver) {
-    if (isShooting && currentBubble) {
-        currentBubble.draw(ctx);
-    }
+                // Stop at ceiling or if going too far
+                if (simY < RADIUS * 2 || simY > cy) {
+                    ctx.lineTo(simX, simY);
+                    break;
+                }
 
-    let angle = currentAngle;
-
-    // Draw aim guide line with BOUNCE PREVIEW
-    if (!isShooting) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 8]);
-
-        // Simulate trajectory with bounces
-        let simX = cx;
-        let simY = cy;
-        let simVX = Math.cos(angle);
-        let simVY = Math.sin(angle);
-        const maxPoints = 200;
-        const stepSize = 5;
-
-        ctx.beginPath();
-        ctx.moveTo(simX, simY);
-
-        for (let i = 0; i < maxPoints; i++) {
-            simX += simVX * stepSize;
-            simY += simVY * stepSize;
-
-            // Wall bounce
-            if (simX < RADIUS) {
-                simX = RADIUS;
-                simVX *= -1;
-            } else if (simX > GAME_WIDTH - RADIUS) {
-                simX = GAME_WIDTH - RADIUS;
-                simVX *= -1;
-            }
-
-            // Stop at ceiling or if going too far
-            if (simY < RADIUS * 2 || simY > cy) {
-                ctx.lineTo(simX, simY);
-                break;
-            }
-
-            // Check collision with existing bubbles
-            let hitBubble = false;
-            for (let r = 0; r < GRID_ROWS && !hitBubble; r++) {
-                for (let c = 0; c < GRID_COLS && !hitBubble; c++) {
-                    const b = grid[r][c];
-                    if (b && !b.popping && !b.dropping) {
-                        const dist = Math.hypot(simX - b.x, simY - b.y);
-                        if (dist < RADIUS * 2) {
-                            hitBubble = true;
+                // Check collision with existing bubbles
+                let hitBubble = false;
+                for (let r = 0; r < GRID_ROWS && !hitBubble; r++) {
+                    for (let c = 0; c < GRID_COLS && !hitBubble; c++) {
+                        const b = grid[r][c];
+                        if (b && !b.popping && !b.dropping) {
+                            const dist = Math.hypot(simX - b.x, simY - b.y);
+                            if (dist < RADIUS * 2) {
+                                hitBubble = true;
+                            }
                         }
                     }
                 }
-            }
 
-            if (hitBubble) {
+                if (hitBubble) {
+                    ctx.lineTo(simX, simY);
+                    // Draw landing indicator circle
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(simX, simY, RADIUS, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.setLineDash([]);
+                    ctx.stroke();
+                    break;
+                }
+
                 ctx.lineTo(simX, simY);
-                // Draw landing indicator circle
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(simX, simY, RADIUS, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.setLineDash([]);
-                ctx.stroke();
-                break;
             }
 
-            ctx.lineTo(simX, simY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
         }
 
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+
+        ctx.fillStyle = '#eee';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.rect(0, -5, 60, 10);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        const dangerY = (GRID_ROWS - 2) * ROW_HEIGHT + GRID_TOP_OFFSET;
+        ctx.beginPath();
+        ctx.moveTo(0, dangerY);
+        ctx.lineTo(GAME_WIDTH, dangerY);
+        ctx.strokeStyle = 'rgba(233, 69, 96, 0.2)';
+        ctx.setLineDash([10, 10]);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.restore();
     }
 
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(angle);
+    // Draw floating texts
+    for (const ft of floatingTexts) {
+        ft.draw(ctx);
+    }
 
-    ctx.fillStyle = '#eee';
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.beginPath();
-    ctx.rect(0, -5, 60, 10);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(0, 0, 20, 0, Math.PI * 2);
-    ctx.fill();
+    // Draw confetti
+    for (const c of confettiParticles) {
+        c.draw(ctx);
+    }
 
+    // Draw screen flash overlay (for bass drop effect)
+    if (screenFlashAlpha > 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${screenFlashAlpha})`;
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    }
+
+    // Restore from screen shake
     ctx.restore();
-
-    const dangerY = (GRID_ROWS - 2) * ROW_HEIGHT + GRID_TOP_OFFSET;
-    ctx.beginPath();
-    ctx.moveTo(0, dangerY);
-    ctx.lineTo(GAME_WIDTH, dangerY);
-    ctx.strokeStyle = 'rgba(233, 69, 96, 0.2)';
-    ctx.setLineDash([10, 10]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-}
-
-// Draw floating texts
-for (const ft of floatingTexts) {
-    ft.draw(ctx);
-}
-
-// Draw confetti
-for (const c of confettiParticles) {
-    c.draw(ctx);
-}
-
-// Draw screen flash overlay (for bass drop effect)
-if (screenFlashAlpha > 0) {
-    ctx.fillStyle = `rgba(255, 255, 255, ${screenFlashAlpha})`;
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-}
-
-// Restore from screen shake
-ctx.restore();
 }
 
 function loop(timestamp) {
@@ -2588,17 +2458,8 @@ function startGame() {
     comboMultiplier = 1;
     activePowerUp = null;
     freezeShots = 0;
-    comboCount = 0;
-    comboMultiplier = 1;
-    activePowerUp = null;
-    freezeShots = 0;
     currentAngle = -Math.PI / 2;
-
-    // Init Queue
-    bubbleQueue = [];
-    for (let i = 0; i < QUEUE_SIZE; i++) {
-        bubbleQueue.push(generateNextBubbleData());
-    }
+    nextBubble = getNextBubble();
 
     updateUI();
     updateMissIndicator();
@@ -2613,7 +2474,6 @@ function startGame() {
 
 // Init
 resize();
-checkUpdate(); // Check for updates on load
 loadPlayerData();
 showScreen('main-menu');
 // Initial draw to show something on background (optional)
