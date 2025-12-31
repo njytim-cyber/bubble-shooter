@@ -1868,6 +1868,7 @@ function placeBubble(r, c, color, type = BUBBLE_NORMAL) {
             score += Math.floor(matches.length * 10 * comboMultiplier);
             spawnFloatingText(grid[r][c]?.x || GAME_WIDTH / 2, grid[r][c]?.y || GAME_HEIGHT / 2, Math.floor(matches.length * 10 * comboMultiplier));
             vibrate(20);
+            screenShakeAmount = Math.min(matches.length * 2, 15); // Shake based on match size
             wasSuccessfulMatch = true;
         } else {
             // Miss - reset combo
@@ -2437,9 +2438,18 @@ function draw() {
         ctx.translate(cx, cy);
         ctx.rotate(angle);
 
-        ctx.fillStyle = '#eee';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        // Combo Heat Effect - glow intensifies with combo
+        if (comboCount > 0) {
+            const heatIntensity = Math.min(comboCount / 5, 1); // Max at 5 combo
+            const heatHue = 30 - heatIntensity * 30; // Orange to red
+            ctx.shadowBlur = 20 + heatIntensity * 30;
+            ctx.shadowColor = `hsl(${heatHue}, 100%, 50%)`;
+        } else {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        }
+
+        ctx.fillStyle = comboCount > 0 ? `hsl(${30 - Math.min(comboCount, 5) * 6}, 80%, 70%)` : '#eee';
         ctx.beginPath();
         ctx.rect(0, -5, 60, 10);
         ctx.fill();
