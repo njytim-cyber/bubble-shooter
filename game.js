@@ -1688,11 +1688,13 @@ class Particle {
         this.y = y;
         this.color = color;
         const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 100 + 50;
+        const speed = Math.random() * 150 + 80; // Faster particles
         this.vx = Math.cos(angle) * speed;
         this.vy = Math.sin(angle) * speed;
         this.life = 1.0;
-        this.decay = Math.random() * 1.5 + 0.5;
+        this.decay = Math.random() * 1.2 + 0.4; // Slower decay
+        this.size = Math.random() * 0.5 + 0.3; // Varied sizes
+        this.sparkle = Math.random() > 0.7; // Some sparkle
     }
 
     update(dt) {
@@ -1703,12 +1705,20 @@ class Particle {
 
     draw(ctx) {
         if (this.life <= 0) return;
+        ctx.save();
         ctx.globalAlpha = this.life;
+
+        // Sparkle effect on some particles
+        if (this.sparkle) {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#FFD700';
+        }
+
         ctx.fillStyle = this.color;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, RADIUS / 3, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, RADIUS * this.size, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1.0;
+        ctx.restore();
     }
 }
 
@@ -2416,13 +2426,23 @@ function draw() {
 
                 if (hitBubble) {
                     ctx.lineTo(simX, simY);
-                    // Draw landing indicator circle
+                    // Draw landing indicator - ghost bubble with next bubble's color
                     ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Ghost bubble fill
                     ctx.beginPath();
                     ctx.arc(simX, simY, RADIUS, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                    ctx.setLineDash([]);
+                    ctx.fillStyle = nextBubble ? hexToRgba(nextBubble.color, 0.3) : 'rgba(255, 255, 255, 0.2)';
+                    ctx.fill();
+
+                    // Ghost bubble outline
+                    ctx.beginPath();
+                    ctx.arc(simX, simY, RADIUS, 0, Math.PI * 2);
+                    ctx.strokeStyle = nextBubble ? hexToRgba(nextBubble.color, 0.6) : 'rgba(255, 255, 255, 0.4)';
+                    ctx.lineWidth = 2;
                     ctx.stroke();
+                    ctx.lineWidth = 1;
                     break;
                 }
 
