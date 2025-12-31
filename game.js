@@ -2359,13 +2359,36 @@ function draw() {
             ctx.save();
             ctx.translate(cx, cy);
 
+            // Enhanced glow for visibility on mobile
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = nextBubble.color;
+
+            // Power-up visual effects
+            if (activePowerUp === 'freeze') {
+                // Ice effect - blue glow and snowflake-like sparkles
+                ctx.shadowColor = '#00BFFF';
+                ctx.shadowBlur = 30;
+            } else if (activePowerUp === 'fire') {
+                // Fire effect - orange/red glow
+                ctx.shadowColor = '#FF4500';
+                ctx.shadowBlur = 35;
+            }
+
+            // Main bubble - slightly larger for mobile visibility
             ctx.beginPath();
-            ctx.arc(0, 0, RADIUS, 0, Math.PI * 2);
+            ctx.arc(0, 0, RADIUS * 1.1, 0, Math.PI * 2);
             ctx.fillStyle = nextBubble.color;
             ctx.fill();
+
+            // White outline for better visibility
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Shine highlight
             ctx.beginPath();
-            ctx.arc(-RADIUS * 0.3, -RADIUS * 0.3, RADIUS * 0.3, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.arc(-RADIUS * 0.3, -RADIUS * 0.3, RADIUS * 0.35, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
             ctx.fill();
 
             ctx.restore();
